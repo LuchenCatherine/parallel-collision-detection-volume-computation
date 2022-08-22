@@ -63,7 +63,7 @@ void parse_json(json::value const &jvalue, json::value &answer)
    Surface_mesh tissue_mesh;
    std::vector<Point> points; //center of voxels inside the tissue block
    tissue_transform(params, tissue_mesh, points, 10);
-   GeoInfo geo_info = extract_params(params);
+   // GeoInfo geo_info = extract_params(params);
    // tissue_transform(geo_info, tissue_mesh);
 
 
