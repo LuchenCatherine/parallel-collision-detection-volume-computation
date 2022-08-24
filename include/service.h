@@ -31,6 +31,9 @@ void display_json(json::value const & jvalue, utility::string_t const & prefix);
 //parse json
 void parse_json(json::value const &jvalue, json::value &answer);
 
+// construct response
+void construct_response(json::value &answer, std::vector<std::pair<std::string, double>> &result, double tissue_volume, double elapsed_time);
+
 // handle get request
 void handle_get(http_request request);
 
@@ -39,3 +42,5 @@ void handle_post(http_request request);
 
 // handle request by action
 void handle_request(http_request request, std::function<void(json::value const &, json::value &)> action);
+
+void init(std::unordered_map<std::string, std::vector<Mymesh>> &total_body);

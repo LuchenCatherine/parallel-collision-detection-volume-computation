@@ -1,5 +1,120 @@
 #include "algo.h"
 
+// only collision detection
+std::vector<std::string> collision_detection_single_tissue(std::vector<Mymesh> &organ, Mymesh &tissue)
+{
+
+    auto aabbtree_tissue = tissue.get_aabb_tree();
+    std::vector<std::string> result;
+
+    auto t1 = std::chrono::high_resolution_clock::now();
+
+    for (int i = 0; i < organ.size(); i++)
+    {
+        auto AS = organ[i];
+        auto aabbtree_AS = AS.get_aabb_tree();
+
+        if (aabbtree_AS->do_intersect(*aabbtree_tissue)) result.push_back(AS.label);
+        else
+        {
+            Surface_mesh &mesh = tissue.get_raw_mesh();
+                
+            // the tissue block is wholely inside the anatomical structure. 
+            bool is_contain_1 = true;
+            for (auto vd: mesh.vertices())
+            {
+                Point p = mesh.point(vd);
+                if (!AS.point_inside(p)) 
+                {
+                    is_contain_1 = false; 
+                    break;
+                }
+            }
+
+            // the anatomical structure is wholely inside the tissue block, still use the voxel-based algorithm, can be simplified to use the volume of the anatomical structure. 
+            bool is_contain_2 = true;
+            Surface_mesh &AS_raw_mesh = AS.get_raw_mesh();
+
+            for (auto vd: AS_raw_mesh.vertices())
+            {
+                Point p = AS_raw_mesh.point(vd);
+                
+                if (!tissue.point_inside(p))
+                    is_contain_2 = false;
+                break;
+            }
+
+            if (is_contain_1 || is_contain_2) result.push_back(AS.label);
+        }
+
+
+    }
+    auto t2 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration2 = t2 - t1;
+    std::cout << "normal function running time: " << duration2.count() << " seconds" << std::endl;  
+    return result;
+
+}
+
+// collision detection only + return elapsed_time
+std::vector<std::string> collision_detection_single_tissue(std::vector<Mymesh> &organ, Mymesh &tissue, double &elapsed_time)
+{
+    auto aabbtree_tissue = tissue.get_aabb_tree();
+    std::vector<std::string> result;
+
+    auto t1 = std::chrono::high_resolution_clock::now();
+
+    for (int i = 0; i < organ.size(); i++)
+    {
+        auto AS = organ[i];
+        auto aabbtree_AS = AS.get_aabb_tree();
+
+        if (aabbtree_AS->do_intersect(*aabbtree_tissue)) result.push_back(AS.label);
+        else
+        {
+            Surface_mesh &mesh = tissue.get_raw_mesh();
+                
+            // the tissue block is wholely inside the anatomical structure. 
+            bool is_contain_1 = true;
+            for (auto vd: mesh.vertices())
+            {
+                Point p = mesh.point(vd);
+                if (!AS.point_inside(p)) 
+                {
+                    is_contain_1 = false; 
+                    break;
+                }
+            }
+
+            // the anatomical structure is wholely inside the tissue block, still use the voxel-based algorithm, can be simplified to use the volume of the anatomical structure. 
+            bool is_contain_2 = true;
+            Surface_mesh &AS_raw_mesh = AS.get_raw_mesh();
+
+            for (auto vd: AS_raw_mesh.vertices())
+            {
+                Point p = AS_raw_mesh.point(vd);
+                
+                if (!tissue.point_inside(p))
+                    is_contain_2 = false;
+                break;
+            }
+
+
+            if (is_contain_1 || is_contain_2) result.push_back(AS.label);
+        }
+
+    }
+
+    auto t2 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration = t2 - t1;
+    std::cout << "normal function running time: " << duration.count() << " seconds" << std::endl;
+    elapsed_time = duration.count();  
+    
+    return result;
+}
+
+
+// collision detection + volume computation + points generated offline
 std::vector<std::pair<std::string, double>> collision_detection_single_tissue(std::vector<Mymesh> &organ, Mymesh &tissue, std::vector<Point> &points)
 {
     auto aabbtree_tissue = tissue.get_aabb_tree();
@@ -67,6 +182,140 @@ std::vector<std::pair<std::string, double>> collision_detection_single_tissue(st
     return result;
 }
 
+// helper function for volume computation, collision detection only with return value of indexes
+std::vector<int> helper_collision_detection_single_tissue_return_index(std::vector<Mymesh> &organ, Mymesh &tissue)
+{
+    auto aabbtree_tissue = tissue.get_aabb_tree();
+    std::vector<int> result;
+
+    auto t1 = std::chrono::high_resolution_clock::now();
+
+    for (int i = 0; i < organ.size(); i++)
+    {
+        auto AS = organ[i];
+        auto aabbtree_AS = AS.get_aabb_tree();
+
+        if (aabbtree_AS->do_intersect(*aabbtree_tissue)) result.push_back(i);
+        else
+        {
+            Surface_mesh &mesh = tissue.get_raw_mesh();
+                
+            // the tissue block is wholely inside the anatomical structure. 
+            bool is_contain_1 = true;
+            for (auto vd: mesh.vertices())
+            {
+                Point p = mesh.point(vd);
+                if (!AS.point_inside(p)) 
+                {
+                    is_contain_1 = false; 
+                    break;
+                }
+            }
+
+            // the anatomical structure is wholely inside the tissue block, still use the voxel-based algorithm, can be simplified to use the volume of the anatomical structure. 
+            bool is_contain_2 = true;
+            Surface_mesh &AS_raw_mesh = AS.get_raw_mesh();
+
+            for (auto vd: AS_raw_mesh.vertices())
+            {
+                Point p = AS_raw_mesh.point(vd);
+                
+                if (!tissue.point_inside(p))
+                    is_contain_2 = false;
+                break;
+            }
+
+
+            if (is_contain_1 || is_contain_2) 
+                result.push_back(i);
+        }
+
+    }
+    
+    return result;
+}
+
+// collision detection + volume computation + points generated on-the-fly
+std::vector<std::pair<std::string, double>> collision_detection_volume_computation_single_tissue(std::vector<Mymesh> &organ, Mymesh &tissue, GeoInfo &geo_info, int resolution, std::string method, double &elapsed_time)
+{
+    std::vector<int> indexes = helper_collision_detection_single_tissue_return_index(organ, tissue);
+    double percentage;
+    std::vector<std::pair<std::string, double>> result;
+
+    auto t1 = std::chrono::high_resolution_clock::now();
+
+    for (auto i: indexes)
+    {
+        auto AS = organ[i];
+        if (method == "parallel")
+            percentage = voxelization_volume_computation_openmp(geo_info, AS, resolution);
+        else
+            percentage = voxelization_volume_computation(geo_info, AS, resolution);
+        
+        result.push_back({AS.label, percentage});
+
+    }
+    auto t2 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration = t2 - t1;
+    elapsed_time = duration.count();
+
+    return result;
+
+}
+
+std::vector<std::pair<std::string, double>> collision_detection_boolean_operation(std::vector<Mymesh> &organ, Mymesh &tissue, double &elapsed_time)
+{
+    std::vector<int> indexes = helper_collision_detection_single_tissue_return_index(organ, tissue);
+    double percentage;
+    std::vector<std::pair<std::string, double>> result;
+
+    auto t1 = std::chrono::high_resolution_clock::now();
+
+    auto &raw_tissue = tissue.get_raw_mesh();
+    if (PMP::does_self_intersect(raw_tissue))
+    {
+        std::cout << "tissue has self intersection\n";
+        return result;
+
+    }
+
+    if (!PMP::does_bound_a_volume(raw_tissue))
+    {
+        std::cout << "tissue does not bound a volume\n";
+        return result;
+    }
+
+    for (auto i: indexes)
+    {
+        auto AS = organ[i];
+        Surface_mesh output;
+        auto &raw_AS = AS.get_raw_mesh();
+
+        if (PMP::does_self_intersect(raw_AS))
+        {
+            std::cout << AS.label << " has self intersection\n";
+            continue;
+        }
+
+        if (!PMP::does_bound_a_volume(raw_AS))
+        {
+            std::cout << AS.label << " does not bound a volume\n";
+            continue;
+        }
+        PMP::corefine_and_compute_intersection(raw_AS, raw_tissue, output);
+        double volume = PMP::volume(output);
+        std::cout << AS.label << ": " << volume << std::endl;
+        result.push_back({AS.label, volume});
+
+    }
+    auto t2 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration = t2 - t1;
+    elapsed_time = duration.count();
+
+    return result;
+
+}
+// test multiple volume computation methods
 std::vector<std::pair<std::string, double>> collision_detection_single_tissue(std::vector<Mymesh> &organ, Mymesh &tissue, std::vector<Point> &points, GeoInfo &geo_info, int resolution)
 {
     auto aabbtree_tissue = tissue.get_aabb_tree();
@@ -239,32 +488,7 @@ double voxelization_volume_computation_openmp(GeoInfo &geo_info, Mymesh &anatomi
     return percentage;
 }
 
-
-std::vector<std::string> collision_detection_single_tissue(std::vector<Mymesh> &organ, Mymesh &tissue)
-{
-
-    auto aabbtree_tissue = tissue.get_aabb_tree();
-    std::vector<std::string> result;
-
-    auto t1 = std::chrono::high_resolution_clock::now();
-
-    for (int i = 0; i < organ.size(); i++)
-    {
-        auto AS = organ[i];
-        auto aabbtree_AS = AS.get_aabb_tree();
-
-        if (aabbtree_AS->do_intersect(*aabbtree_tissue)) result.push_back(AS.label);
-
-    }
-
-    auto t2 = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> duration2 = t2 - t1;
-    std::cout << "normal function running time: " << duration2.count() << " seconds" << std::endl;  
-    return result;
-
-}
-
-
+// useless, to be deleted 
 std::vector<std::string> collision_detection_single_tissue_parallel(std::vector<Mymesh> &organ, Mymesh &tissue)
 {
     auto aabbtree_tissue = tissue.get_aabb_tree();
@@ -300,6 +524,7 @@ std::vector<std::string> collision_detection_single_tissue_parallel(std::vector<
     return result;
 }
 
+// brute force, not accurate needs to consider two more occasions.
 std::vector<std::string> collision_detection_brute_force(std::vector<Mymesh> &organ, Mymesh &tissue)
 {
 
@@ -334,6 +559,8 @@ bool intersection_brute_force(std::vector<Triangle> &faces1, std::vector<Triangl
 
     return false;
 }
+
+
 
 
 // void create_rtree(std::vector<std::vector<Mymesh>> &organ, rtree_3 &rtree)

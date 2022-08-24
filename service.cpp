@@ -50,6 +50,7 @@ void parse_json(json::value const &jvalue, json::value &answer)
    
    auto algorithm = jvalue.at("algorithm").as_string();
    int resolution = jvalue.at("resolution").as_integer();
+   bool compute_volume = jvalue.at("compute_volume").as_bool();
 
    std::string organ_file_name = mapping[organ_split(target)];
    std::cout << "target url: " << target << " target: " << refence_organ_name << " " << "organ file name: " << organ_file_name << std::endl;
@@ -63,7 +64,7 @@ void parse_json(json::value const &jvalue, json::value &answer)
    Surface_mesh tissue_mesh;
    std::vector<Point> points; //center of voxels inside the tissue block
    tissue_transform(params, tissue_mesh, points, 10);
-   // GeoInfo geo_info = extract_params(params);
+   GeoInfo geo_info = extract_params(params);
    // tissue_transform(geo_info, tissue_mesh);
 
 
@@ -110,70 +111,28 @@ void parse_json(json::value const &jvalue, json::value &answer)
          answer[i] = AS;
       }
    }
+   // else if (algorithm == "experiment_normal_single")
+   // {
+   //    auto t1 = std::chrono::high_resolution_clock::now();
+   //    auto result = collision_detection_single_tissue(total_body[organ_file_name], my_tissue);
+   //    auto t2 = std::chrono::high_resolution_clock::now();
+   //    std::chrono::duration<double> duration2 = t2 - t1;
+   //    std::cout << "normal running time is " << duration2.count() << " seconds" << std::endl;  
 
-   else if (algorithm == "experiment_normal")
-   {
-      auto t1 = std::chrono::high_resolution_clock::now();
+   //    print_result(algorithm, result);
 
-      for (auto &organ_item: total_body)
-      {
-         auto result = collision_detection_single_tissue(organ_item.second, my_tissue);
-      }
+   // }
+   // else if (algorithm == "experiment_parallel_single")
+   // {
+   //    auto t1 = std::chrono::high_resolution_clock::now();
+   //    auto result = collision_detection_single_tissue_parallel(total_body[organ_file_name], my_tissue);
+   //    auto t2 = std::chrono::high_resolution_clock::now();
+   //    std::chrono::duration<double> duration2 = t2 - t1;
+   //    std::cout << "parallel running time is " << duration2.count() << " seconds" << std::endl;  
 
-      auto t2 = std::chrono::high_resolution_clock::now();
-      std::chrono::duration<double> duration2 = t2 - t1;
-      std::cout << "[test all organs] normal running time is " << duration2.count() << " seconds" << std::endl;  
-
-   }
-   else if (algorithm == "experiment_normal_single")
-   {
-      auto t1 = std::chrono::high_resolution_clock::now();
-      auto result = collision_detection_single_tissue(total_body[organ_file_name], my_tissue);
-      auto t2 = std::chrono::high_resolution_clock::now();
-      std::chrono::duration<double> duration2 = t2 - t1;
-      std::cout << "normal running time is " << duration2.count() << " seconds" << std::endl;  
-
-      print_result(algorithm, result);
-
-   }
-   else if (algorithm == "experiment_parallel")
-   {
-      auto t1 = std::chrono::high_resolution_clock::now();
-      
-      for (auto &organ_item: total_body)
-      {
-         auto result = collision_detection_single_tissue_parallel(organ_item.second, my_tissue);
-      }
-      auto t2 = std::chrono::high_resolution_clock::now();
-      std::chrono::duration<double> duration2 = t2 - t1;
-      std::cout << "[test all organs] parallel running time is " << duration2.count() << " seconds" << std::endl;  
-
-   }
-   else if (algorithm == "experiment_parallel_single")
-   {
-      auto t1 = std::chrono::high_resolution_clock::now();
-      auto result = collision_detection_single_tissue_parallel(total_body[organ_file_name], my_tissue);
-      auto t2 = std::chrono::high_resolution_clock::now();
-      std::chrono::duration<double> duration2 = t2 - t1;
-      std::cout << "parallel running time is " << duration2.count() << " seconds" << std::endl;  
-
-      print_result(algorithm, result);
-   }
+   //    print_result(algorithm, result);
+   // }
    else if (algorithm == "brute_force")
-   {
-      auto t1 = std::chrono::high_resolution_clock::now();
-      
-      for (auto &organ_item: total_body)
-      {
-         auto result = collision_detection_brute_force(organ_item.second, my_tissue);
-      }
-
-      auto t2 = std::chrono::high_resolution_clock::now();
-      std::chrono::duration<double> duration2 = t2 - t1;
-      std::cout << "[test all organs] brute force running time is " << duration2.count() << " seconds" << std::endl;  
-
-   }
-   else if (algorithm == "brute_force_single")
    {
       auto t1 = std::chrono::high_resolution_clock::now();
       
@@ -189,10 +148,80 @@ void parse_json(json::value const &jvalue, json::value &answer)
       std::cout << "brute force running time is " << duration2.count() << " seconds" << std::endl;  
 
       print_result(algorithm, result);
+      answer["computation_time"] = duration2.count();
+
+   }
+   else if (algorithm == "parallel" || algorithm == "normal")
+   {
+      if (compute_volume)
+      {
+         double elapsed_time = 0;
+         auto result = collision_detection_volume_computation_single_tissue(total_body[organ_file_name], my_tissue, geo_info, resolution, algorithm, elapsed_time);
+
+         // print_result(algorithm, result);
+         std::cout << "result:\nlabel         percentage" << std::endl;
+         for (auto s: result) {std::cout << s.first << " " << s.second << std::endl;}
+
+         //construct the response
+         double tissue_volume = params["x_dimension"] * params["y_dimension"] * params["z_dimension"];
+         construct_response(answer, result, tissue_volume, elapsed_time);
+      }
+      else
+      {
+         double elapsed_time = 0;
+         auto result = collision_detection_single_tissue(total_body[organ_file_name], my_tissue, elapsed_time);
+         print_result(algorithm, result);
+         answer["computation_time"] = elapsed_time;
+      }
+
+   }
+   else if (algorithm == "boolean_operation")
+   {
+      double elapsed_time = 0;
+      auto result = collision_detection_boolean_operation(total_body[organ_file_name], my_tissue, elapsed_time);
+      double tissue_volume = params["x_dimension"] * params["y_dimension"] * params["z_dimension"];
+      construct_response(answer, result, tissue_volume, elapsed_time);
 
    }
 
 }
+
+void construct_response(json::value &answer, std::vector<std::pair<std::string, double>> &result, double tissue_volume, double elapsed_time)
+{
+   json::value mesh_collision_detection_result;
+   for (int i = 0; i < result.size(); i++)
+   {
+      auto res = result[i];
+      json::value AS;
+      
+      auto node_name = res.first;
+      SpatialEntity &se = mapping_node_spatial_entity[node_name];
+      AS[U("node_name")] = json::value::string(U(node_name));
+      // AS[U("label")] = json::value::string(U(se.label));
+      // AS[U("representation_of")] = json::value::string(U(se.representation_of));
+      // AS[U("id")] = json::value::string("http://purl.org/ccf/latest/ccf.owl" + se.source_spatial_entity + "_" + node_name);
+
+      if (res.second < 0)  
+      {
+         AS[U("percentage")] = json::value(0);
+         AS[U("is_closed")] = json::value(false);
+      }
+      else
+      {
+         AS[U("percentage")] = json::value(res.second);
+         AS[U("volume")] = json::value(res.second * tissue_volume);
+         AS[U("is_closed")] = json::value(true);
+      }
+      
+      mesh_collision_detection_result[i] = AS;
+   }
+
+   answer["mesh_collision_detection_result"] = mesh_collision_detection_result;
+   answer["computation_time"] = elapsed_time;
+
+
+}
+
 
 // handle get request
 void handle_get(http_request request)
@@ -258,4 +287,17 @@ void handle_request(http_request request, std::function<void(json::value const &
       request.reply(status_codes::OK, answer);
    else
       request.reply(status_codes::OK, json::value::array());
+}
+
+
+void init(std::unordered_map<std::string, std::vector<Mymesh>> &total_body)
+{
+   std::cout << "############### init start ###############\n";
+   Mymesh test_tissue("/home/catherine/data/model/test_tissue.off");
+   test_tissue.create_aabb_tree();
+   test_tissue.extract_faces();
+
+   for (auto &organ_item: total_body) collision_detection_single_tissue(organ_item.second, test_tissue);
+   std::cout << "############### init completed ###############\n";
+
 }

@@ -30,14 +30,24 @@ target_link_libraries(server2 cpprestsdk::cpprest)
 # target_link_libraries(server PRIVATE geometry)
 ## target_link_libraries(server ${CGAL_LIBRARIES} ${CGAL_3RD_PARTY_LIBRARIES})
 
+add_executable(experiment experiment.cpp)
+target_link_libraries(experiment Eigen3::Eigen)
+target_link_libraries(experiment OpenMP::OpenMP_CXX)
+target_link_libraries(experiment CGAL::CGAL)
+target_link_libraries(experiment geometry)
+
 set(Boost_USE_STATIC_LIBS OFF) 
 set(Boost_USE_MULTITHREADED ON)  
 set(Boost_USE_STATIC_RUNTIME OFF) 
 find_package(Boost 1.45.0 COMPONENTS filesystem)
 
+
+
+
 if(Boost_FOUND)
     include_directories(${Boost_INCLUDE_DIRS}) 
     target_link_libraries(server2 ${Boost_LIBRARIES})
+    target_link_libraries(experiment ${Boost_LIBRARIES})
 endif()
 
 

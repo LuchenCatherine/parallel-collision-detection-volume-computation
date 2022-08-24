@@ -31,6 +31,8 @@ int main(int argc, char **argv)
    load_ASCT_B(asct_b_file_path, mapping, mapping_node_spatial_entity);
    load_all_organs(body_path, total_body);
 
+   init(total_body);
+   
    http_listener listener("http://" + server_ip + ":" + port + "/get-collisions");
 
    listener.support(methods::GET,  handle_get);
