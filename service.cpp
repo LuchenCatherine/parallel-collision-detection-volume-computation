@@ -134,21 +134,10 @@ void parse_json(json::value const &jvalue, json::value &answer)
    // }
    else if (algorithm == "brute_force")
    {
-      auto t1 = std::chrono::high_resolution_clock::now();
-      
-      // for (auto &organ_item: total_body)
-      // {
-      //    auto result = collision_detection_brute_force(organ_item.second, my_tissue);
-      //    print_result(algorithm, result);
-      // }
+      double elapsed_time = 0;
 
-      auto result = collision_detection_brute_force(total_body[organ_file_name], my_tissue);
-      auto t2 = std::chrono::high_resolution_clock::now();
-      std::chrono::duration<double> duration2 = t2 - t1;
-      std::cout << "brute force running time is " << duration2.count() << " seconds" << std::endl;  
-
-      print_result(algorithm, result);
-      answer["computation_time"] = duration2.count();
+      auto result = collision_detection_brute_force(total_body[organ_file_name], my_tissue, elapsed_time);
+      construct_response(answer, result, elapsed_time);
 
    }
    else if (algorithm == "parallel" || algorithm == "normal")
@@ -170,8 +159,7 @@ void parse_json(json::value const &jvalue, json::value &answer)
       {
          double elapsed_time = 0;
          auto result = collision_detection_single_tissue(total_body[organ_file_name], my_tissue, elapsed_time);
-         print_result(algorithm, result);
-         answer["computation_time"] = elapsed_time;
+         construct_response(answer, result, elapsed_time);
       }
 
    }
@@ -180,9 +168,58 @@ void parse_json(json::value const &jvalue, json::value &answer)
       double elapsed_time = 0;
       auto result = collision_detection_boolean_operation(total_body[organ_file_name], my_tissue, elapsed_time);
       double tissue_volume = params["x_dimension"] * params["y_dimension"] * params["z_dimension"];
-      construct_response(answer, result, tissue_volume, elapsed_time);
+      construct_response_boolean(answer, result, tissue_volume, elapsed_time);
 
    }
+   else if (algorithm == "rtree_aabb")
+   {
+      double elapsed_time = 0;
+      auto result = collision_detection_single_tissue(total_body[organ_file_name], my_tissue, mapping_organ_rtree[organ_file_name], elapsed_time);
+      construct_response(answer, result, elapsed_time);
+   }
+   else if (algorithm == "rtree")
+   {
+      double elapsed_time = 0;
+      auto result = collision_detection_with_rtree(total_body[organ_file_name], my_tissue, mapping_organ_rtree[organ_file_name], elapsed_time);
+      construct_response(answer, result, elapsed_time);
+
+   }
+
+}
+
+void construct_response_boolean(json::value &answer, std::vector<std::pair<std::string, double>> &result, double tissue_volume, double elapsed_time)
+{
+   json::value mesh_collision_detection_result;
+   for (int i = 0; i < result.size(); i++)
+   {
+      auto res = result[i];
+      json::value AS;
+      
+      auto node_name = res.first;
+      SpatialEntity &se = mapping_node_spatial_entity[node_name];
+      AS[U("node_name")] = json::value::string(U(node_name));
+      // AS[U("label")] = json::value::string(U(se.label));
+      // AS[U("representation_of")] = json::value::string(U(se.representation_of));
+      // AS[U("id")] = json::value::string("http://purl.org/ccf/latest/ccf.owl" + se.source_spatial_entity + "_" + node_name);
+
+      if (res.second < 0)  
+      {
+         AS[U("percentage")] = json::value(0);
+         AS[U("is_closed")] = json::value(false);
+      }
+      else
+      {
+         AS[U("percentage")] = json::value(res.second / tissue_volume);
+         AS[U("volume")] = json::value(res.second);
+         AS[U("is_closed")] = json::value(true);
+      }
+      
+      mesh_collision_detection_result[i] = AS;
+   }
+
+   answer["mesh_collision_detection_result"] = mesh_collision_detection_result;
+   answer["computation_time"] = elapsed_time;
+
 
 }
 
@@ -222,6 +259,28 @@ void construct_response(json::value &answer, std::vector<std::pair<std::string, 
 
 }
 
+void construct_response(json::value &answer, std::vector<std::string> &result, double elapsed_time)
+{
+   json::value mesh_collision_detection_result;
+   for (int i = 0; i < result.size(); i++)
+   {
+      auto node_name = result[i];
+      json::value AS;
+
+      SpatialEntity &se = mapping_node_spatial_entity[node_name];
+      AS[U("node_name")] = json::value::string(U(node_name));
+      // AS[U("label")] = json::value::string(U(se.label));
+      // AS[U("representation_of")] = json::value::string(U(se.representation_of));
+      // AS[U("id")] = json::value::string("http://purl.org/ccf/latest/ccf.owl" + se.source_spatial_entity + "_" + node_name);
+      
+      mesh_collision_detection_result[i] = AS;
+   }
+
+   answer["mesh_collision_detection_result"] = mesh_collision_detection_result;
+   answer["computation_time"] = elapsed_time;
+
+
+}
 
 // handle get request
 void handle_get(http_request request)
@@ -296,8 +355,12 @@ void init(std::unordered_map<std::string, std::vector<Mymesh>> &total_body)
    Mymesh test_tissue("/home/catherine/data/model/test_tissue.off");
    test_tissue.create_aabb_tree();
    test_tissue.extract_faces();
-
-   for (auto &organ_item: total_body) collision_detection_single_tissue(organ_item.second, test_tissue);
+   
+   for (auto &organ_item: total_body) 
+   {
+      std::cout << organ_item.first << " ";
+      collision_detection_single_tissue(organ_item.second, test_tissue);
+   }
    std::cout << "############### init completed ###############\n";
 
 }

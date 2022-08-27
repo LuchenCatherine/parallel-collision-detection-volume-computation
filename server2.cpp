@@ -1,12 +1,12 @@
 #include "service.h"
-
+#include <algorithm>
 //global variables
 std::map<utility::string_t, utility::string_t> dictionary;
 std::unordered_map<std::string, Eigen::Vector3d> organ_origins;                     //origins of organs
 std::unordered_map<std::string, std::string> mapping;                               //mapping from standard organ name(e.g., #VHFLeftKidney) to glb file name without suffix(e.g., VH_F_Kidney_L)
 std::unordered_map<std::string, std::vector<Mymesh>> total_body;                    //mapping from organ name(glb file name) to vector of meshes of a certain organ
 std::unordered_map<std::string, SpatialEntity> mapping_node_spatial_entity;         // mapping from AS to its information in asct-b table 
-
+std::unordered_map<std::string, rtree_3> mapping_organ_rtree;                       //mapping from organ name to its rtree. 
 
 int main(int argc, char **argv)
 {
@@ -30,6 +30,7 @@ int main(int argc, char **argv)
    gen_origin(organ_origins_file_path, organ_origins);
    load_ASCT_B(asct_b_file_path, mapping, mapping_node_spatial_entity);
    load_all_organs(body_path, total_body);
+   build_rtree_organs(total_body, mapping_organ_rtree);
 
    init(total_body);
    

@@ -9,6 +9,10 @@
 #include "mymesh.h"
 #include "utils.h"
 
+#include "RTree.h"
+
+typedef RTree<int, double, 3, double> rtree_3;
+typedef int ValueType;
 
 std::vector<std::string> collision_detection_single_tissue(std::vector<Mymesh> &organ, Mymesh &tissue);
 
@@ -30,8 +34,15 @@ double voxelization_volume_computation_openmp(GeoInfo &geo_info, Mymesh &anatomi
 
 std::vector<std::string> collision_detection_single_tissue_parallel(std::vector<Mymesh> &organ, Mymesh &tissue);
 
-std::vector<std::string> collision_detection_brute_force(std::vector<Mymesh> &organ, Mymesh &tissue);
+std::vector<std::string> collision_detection_brute_force(std::vector<Mymesh> &organ, Mymesh &tissue, double &elapsed_time);
+
+std::vector<std::string> collision_detection_single_tissue(std::vector<Mymesh> &organ, Mymesh &tissue, rtree_3 &rtree, double &elapsed_time);
+
+std::vector<std::string> collision_detection_with_rtree(std::vector<Mymesh> &organ, Mymesh &tissue, rtree_3 &rtree, double &elapsed_time);
 
 bool intersection_brute_force(std::vector<Triangle> &faces1, std::vector<Triangle> &faces2);
+
+bool MySearchCallback(ValueType id);
+
 
 #endif

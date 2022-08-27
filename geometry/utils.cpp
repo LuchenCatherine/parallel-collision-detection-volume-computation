@@ -218,17 +218,25 @@ void load_all_organs(const std::string &body_path, std::unordered_map<std::strin
     for (fs::directory_entry& organ_path : fs::directory_iterator(body_path)) 
     {
         std::string organ_name = organ_path.path().stem().string();
-        std::cout << organ_name << std::endl;   
+        auto t1 = std::chrono::high_resolution_clock::now();   
         for (fs::directory_entry& AS : fs::directory_iterator(organ_path)) 
         {
             std::string file_path = AS.path().string();
             total_body[organ_name].push_back(Mymesh(file_path));
         }
+        auto t2 = std::chrono::high_resolution_clock::now();
 
         for (auto &AS: total_body[organ_name]){
             AS.create_aabb_tree();
-            AS.extract_faces();
         } 
+        auto t3 = std::chrono::high_resolution_clock::now();
+
+        for (auto &AS: total_body[organ_name]) AS.extract_faces();
+
+        std::chrono::duration<double> duration1 = t2 - t1;
+        std::chrono::duration<double> duration2 = t3 - t2;
+
+        std::cout << organ_name << ", loading time: " << duration1.count() << " building indexes time: " << duration2.count() <<std::endl;  
     }
 
 }
@@ -361,6 +369,33 @@ void load_ASCT_B(const std::string &file_path, std::unordered_map<std::string, s
     
 
 }
+
+void build_rtree_organs(std::unordered_map<std::string, std::vector<Mymesh>> &total_body, std::unordered_map<std::string, rtree_3> &mapping_organ_rtree)
+{
+
+    CGAL::Bbox_3 bb;
+    for (auto &organ: total_body)
+    {
+        std::string name = organ.first;
+        std::vector<Mymesh> &meshes = organ.second;
+
+        for (int i = 0; i < meshes.size(); i++)
+        {
+            double min[3], max[3];
+            bb = PMP::bbox(meshes[i].get_raw_mesh());
+            min[0] = bb.xmin();
+            min[1] = bb.ymin();
+            min[2] = bb.zmin();
+            max[0] = bb.xmax();
+            max[1] = bb.ymax();
+            max[2] = bb.zmax();
+
+            mapping_organ_rtree[name].Insert(min, max, i);
+        }
+    }
+
+}
+
 
 std::string organ_split(const std::string &url)
 {

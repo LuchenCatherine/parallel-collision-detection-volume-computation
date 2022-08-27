@@ -22,7 +22,7 @@ extern std::unordered_map<std::string, Eigen::Vector3d> organ_origins;          
 extern std::unordered_map<std::string, std::string> mapping;                               //mapping from standard organ name(e.g., #VHFLeftKidney) to glb file name without suffix(e.g., VH_F_Kidney_L)
 extern std::unordered_map<std::string, std::vector<Mymesh>> total_body;                    //mapping from organ name(glb file name) to vector of meshes of a certain organ
 extern std::unordered_map<std::string, SpatialEntity> mapping_node_spatial_entity;         // mapping from AS to its information in asct-b table 
-
+extern std::unordered_map<std::string, rtree_3> mapping_organ_rtree;                       //mapping from organ name to its rtree. 
 
 
 //display json
@@ -33,6 +33,11 @@ void parse_json(json::value const &jvalue, json::value &answer);
 
 // construct response
 void construct_response(json::value &answer, std::vector<std::pair<std::string, double>> &result, double tissue_volume, double elapsed_time);
+
+// construct response overloading
+void construct_response(json::value &answer, std::vector<std::string> &result, double elapsed_time);
+
+void construct_response_boolean(json::value &answer, std::vector<std::pair<std::string, double>> &result, double tissue_volume, double elapsed_time);
 
 // handle get request
 void handle_get(http_request request);

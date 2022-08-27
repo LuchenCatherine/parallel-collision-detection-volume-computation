@@ -56,6 +56,75 @@ std::vector<std::string> collision_detection_single_tissue(std::vector<Mymesh> &
 
 }
 
+//rtree + only collision detection
+bool MySearchCallback(ValueType id)
+{
+//   std::cout << "Hit data rect " << id << "\n";
+  return true; // keep going
+}
+
+std::vector<std::string> collision_detection_single_tissue(std::vector<Mymesh> &organ, Mymesh &tissue, rtree_3 &rtree, double &elapsed_time)
+{
+
+    auto aabbtree_tissue = tissue.get_aabb_tree();
+    std::vector<std::string> result;
+
+    auto t1 = std::chrono::high_resolution_clock::now();
+    
+    CGAL::Bbox_3 bb = PMP::bbox(tissue.get_raw_mesh());
+    double search_min[3] = {bb.xmin(), bb.ymin(), bb.zmin()};
+    double search_max[3] = {bb.xmax(), bb.ymax(), bb.zmax()};
+
+    std::vector<int> hits = rtree.Search2(search_min, search_max, MySearchCallback);
+    for (int i: hits)
+    {
+        auto AS = organ[i];
+        auto aabbtree_AS = AS.get_aabb_tree();
+
+        if (aabbtree_AS->do_intersect(*aabbtree_tissue)) result.push_back(AS.label);
+        else
+        {
+            Surface_mesh &mesh = tissue.get_raw_mesh();
+                
+            // the tissue block is wholely inside the anatomical structure. 
+            bool is_contain_1 = true;
+            for (auto vd: mesh.vertices())
+            {
+                Point p = mesh.point(vd);
+                if (!AS.point_inside(p)) 
+                {
+                    is_contain_1 = false; 
+                    break;
+                }
+            }
+
+            // the anatomical structure is wholely inside the tissue block, still use the voxel-based algorithm, can be simplified to use the volume of the anatomical structure. 
+            bool is_contain_2 = true;
+            Surface_mesh &AS_raw_mesh = AS.get_raw_mesh();
+
+            for (auto vd: AS_raw_mesh.vertices())
+            {
+                Point p = AS_raw_mesh.point(vd);
+                
+                if (!tissue.point_inside(p))
+                    is_contain_2 = false;
+                break;
+            }
+
+            if (is_contain_1 || is_contain_2) result.push_back(AS.label);
+        }
+
+
+    }
+    auto t2 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration2 = t2 - t1;
+    elapsed_time = duration2.count();
+    std::cout << "normal [rtree] function running time: " << duration2.count() << " seconds" << std::endl;  
+    return result;
+
+}
+
+
 // collision detection only + return elapsed_time
 std::vector<std::string> collision_detection_single_tissue(std::vector<Mymesh> &organ, Mymesh &tissue, double &elapsed_time)
 {
@@ -303,7 +372,7 @@ std::vector<std::pair<std::string, double>> collision_detection_boolean_operatio
             continue;
         }
         PMP::corefine_and_compute_intersection(raw_AS, raw_tissue, output);
-        double volume = PMP::volume(output);
+        double volume = PMP::volume(output) * 1e9;
         std::cout << AS.label << ": " << volume << std::endl;
         result.push_back({AS.label, volume});
 
@@ -525,8 +594,9 @@ std::vector<std::string> collision_detection_single_tissue_parallel(std::vector<
 }
 
 // brute force, not accurate needs to consider two more occasions.
-std::vector<std::string> collision_detection_brute_force(std::vector<Mymesh> &organ, Mymesh &tissue)
+std::vector<std::string> collision_detection_brute_force(std::vector<Mymesh> &organ, Mymesh &tissue, double &eplapsed_time)
 {
+    auto t1 = std::chrono::high_resolution_clock::now();
 
     auto tissue_faces = tissue.get_faces();
     std::vector<std::string> result;
@@ -537,12 +607,108 @@ std::vector<std::string> collision_detection_brute_force(std::vector<Mymesh> &or
         auto AS_faces = AS.get_faces();
 
         if (intersection_brute_force(*tissue_faces, *AS_faces)) result.push_back(AS.label);
+        else 
+        {
+            Surface_mesh &mesh = tissue.get_raw_mesh();
+                
+            // the tissue block is wholely inside the anatomical structure. 
+            bool is_contain_1 = true;
+            for (auto vd: mesh.vertices())
+            {
+                Point p = mesh.point(vd);
+                if (!AS.point_inside(p)) 
+                {
+                    is_contain_1 = false; 
+                    break;
+                }
+            }
+
+            // the anatomical structure is wholely inside the tissue block, still use the voxel-based algorithm, can be simplified to use the volume of the anatomical structure. 
+            bool is_contain_2 = true;
+            Surface_mesh &AS_raw_mesh = AS.get_raw_mesh();
+
+            for (auto vd: AS_raw_mesh.vertices())
+            {
+                Point p = AS_raw_mesh.point(vd);
+                
+                if (!tissue.point_inside(p))
+                    is_contain_2 = false;
+                break;
+            }
+
+            if (is_contain_1 || is_contain_2) result.push_back(AS.label);
+            
+        }
     }
+
+    auto t2 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration = t2 - t1;
+    eplapsed_time = duration.count();
 
     return result;
 
 }
 
+std::vector<std::string> collision_detection_with_rtree(std::vector<Mymesh> &organ, Mymesh &tissue, rtree_3 &rtree, double &elapsed_time)
+{
+
+    auto tissue_faces = tissue.get_faces();
+    std::vector<std::string> result;
+
+    auto t1 = std::chrono::high_resolution_clock::now();
+    
+    CGAL::Bbox_3 bb = PMP::bbox(tissue.get_raw_mesh());
+    double search_min[3] = {bb.xmin(), bb.ymin(), bb.zmin()};
+    double search_max[3] = {bb.xmax(), bb.ymax(), bb.zmax()};
+
+    std::vector<int> hits = rtree.Search2(search_min, search_max, MySearchCallback);
+    for (int i: hits)
+    {
+        auto AS = organ[i];
+        auto AS_faces = AS.get_faces();
+
+        if (intersection_brute_force(*tissue_faces, *AS_faces)) result.push_back(AS.label);
+        else
+        {
+            Surface_mesh &mesh = tissue.get_raw_mesh();
+                
+            // the tissue block is wholely inside the anatomical structure. 
+            bool is_contain_1 = true;
+            for (auto vd: mesh.vertices())
+            {
+                Point p = mesh.point(vd);
+                if (!AS.point_inside(p)) 
+                {
+                    is_contain_1 = false; 
+                    break;
+                }
+            }
+
+            // the anatomical structure is wholely inside the tissue block, still use the voxel-based algorithm, can be simplified to use the volume of the anatomical structure. 
+            bool is_contain_2 = true;
+            Surface_mesh &AS_raw_mesh = AS.get_raw_mesh();
+
+            for (auto vd: AS_raw_mesh.vertices())
+            {
+                Point p = AS_raw_mesh.point(vd);
+                
+                if (!tissue.point_inside(p))
+                    is_contain_2 = false;
+                break;
+            }
+
+            if (is_contain_1 || is_contain_2) result.push_back(AS.label);
+        }
+
+
+    }
+    auto t2 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration2 = t2 - t1;
+    elapsed_time = duration2.count();
+    std::cout << "normal [rtree] function running time: " << duration2.count() << " seconds" << std::endl;  
+    return result;
+
+}
 
 bool intersection_brute_force(std::vector<Triangle> &faces1, std::vector<Triangle> &faces2)
 {

@@ -7,9 +7,13 @@
 #include <unordered_map>
 #include <Eigen/Dense>
 #include <math.h>
-#include<boost/filesystem.hpp>
+#include <boost/filesystem.hpp>
+#include <chrono>
 
 #include "mymesh.h"
+#include "RTree.h"
+
+typedef RTree<int, double, 3, double> rtree_3;
 
 
 struct SpatialEntity {
@@ -65,3 +69,5 @@ std::string organ_split(const std::string &url);
 void load_ASCT_B(const std::string &file_path, std::unordered_map<std::string, std::string> &mapping, std::unordered_map<std::string, SpatialEntity> &mapping_node_spatial_entity);
 
 void print_result(std::string &algorithm, std::vector<std::string> &result);
+
+void build_rtree_organs(std::unordered_map<std::string, std::vector<Mymesh>> &total_body, std::unordered_map<std::string, rtree_3> &mapping_organ_rtree);
