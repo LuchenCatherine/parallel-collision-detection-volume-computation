@@ -1,0 +1,2 @@
+#!/bin/bash
+./build/server2 /home/catherine/data/model/organ_origins_meter_v1.2.csv /home/catherine/data/model/ASCT-B_3D_Models_Mapping_v1.2.csv /home/catherine/data/model/plain_filling_hole_five_organ/ 0.0.0.0 12345
