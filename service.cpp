@@ -352,7 +352,7 @@ void handle_request(http_request request, std::function<void(json::value const &
 void init(std::unordered_map<std::string, std::vector<Mymesh>> &total_body)
 {
    std::cout << "############### init start ###############\n";
-   Mymesh test_tissue("/home/catherine/data/model/test_tissue.off");
+   Mymesh test_tissue("./model/test_tissue.off");
    test_tissue.create_aabb_tree();
    test_tissue.extract_faces();
    
