@@ -8,12 +8,14 @@ import csv
 from urllib.request import urlopen
 import collections
 
-server_url = 'http://192.168.1.100:12345/get-collisions'
+server_url = 'http://localhost:12345/get-collisions'
 tissue_url = 'https://ccf-api.hubmapconsortium.org/v1/hubmap/rui_locations.jsonld'
 
 
 def post_request(url, rui_location, algorithm='production', resolution=1, compute_volume=True):
 
+    tissue_id = rui_location['@id']
+    tissue_id = tissue_id.split('/')[-1]
     placement = rui_location['placement']
 
     x_dimension = rui_location['x_dimension']
@@ -31,23 +33,24 @@ def post_request(url, rui_location, algorithm='production', resolution=1, comput
     y_scaling = placement['y_scaling']
     z_scaling = placement['z_scaling']
 
-    json_dic = {'x_dimension': x_dimension, 'y_dimension': y_dimension, 'z_dimension': z_dimension,
+    json_dic = {'@id': tissue_id, 'x_dimension': x_dimension, 'y_dimension': y_dimension, 'z_dimension': z_dimension,
                 'x_rotation': x_rotation, 'y_rotation': y_rotation, 'z_rotation': z_rotation,
                 'x_translation': x_translation, 'y_translation': y_translation,
                 'z_translation': z_translation,
                 'x_scaling': x_scaling, 'y_scaling': y_scaling, 'z_scaling': z_scaling,
                 'target': target, 'algorithm': algorithm, 'resolution': resolution, 'compute_volume': compute_volume}
 
-    if "#VHFLeftKidney" in target or "#VHFRightKidney" in target or "#VHMLeftKidney" in target or "#VHMRightKidney" in target:
-        r = requests.post(url=url, json=json_dic)
+    # print("volume: {}".format(x_dimension * y_dimension * z_dimension))
+    r = requests.post(url=url, json=json_dic)
         # print(rui_location['@id'])
-        return r.json()
-
-    return {}
+    return r.json()
 
 
 def process_all_tissues(tissue_url, algorithm, resolution, compute_volume):
+    tissue_set = set()
     total_computation_time = 0
+    count = 0
+    volumes = []
     with open("./rui_locations.jsonld", "r") as f:
         data = json.load(f)
 
@@ -59,13 +62,21 @@ def process_all_tissues(tissue_url, algorithm, resolution, compute_volume):
                 if sample['sample_type'] == 'Tissue Block':
                     rui_location = sample['rui_location']
                     # t1 = time.time()
-                    r = post_request(server_url, rui_location, algorithm, resolution, compute_volume)
-                    # t2 = time.time()
-                    # print(t2 - t1)
-                    # print(r)
-                    if "computation_time" in r:
-                        total_computation_time += r["computation_time"]
+                    target = rui_location['placement']['target']
+                    if "#VHFLeftKidney" in target or "#VHFRightKidney" in target or "#VHMLeftKidney" in target or "#VHMRightKidney" in target:
 
+                        tissue_id = rui_location['@id']
+                        tissue_id = tissue_id.split('/')[-1]
+                        # print(tissue_id)
+                        tissue_set.add(tissue_id)
+                        volume = rui_location['x_dimension'] * rui_location['y_dimension'] * rui_location['z_dimension']
+                        # print("id: {}, volume: {}".format(tissue_id, volume))
+                        volumes.append(volume)
+                        r = post_request(server_url, rui_location, algorithm, resolution, compute_volume)
+                        if "computation_time" in r:
+                            total_computation_time += r["computation_time"]
+
+    print(sum(volumes)/len(volumes))
     return total_computation_time
 
 
@@ -118,6 +129,7 @@ def test_accuracy():
                                 dic2 = {}
 
                                 if cd2:
+                                    print(cd2)
                                     for AS in cd1:
                                         dic1[AS["node_name"]] = AS["volume"]
 
@@ -136,15 +148,17 @@ def test_accuracy():
     print(count)
     for i in range(1, max_resolution):
         print(errors[i])
+        print(len(errors[i]))
     return [sum(errors[i])/len(errors[i]) for i in range(1, max_resolution)]
 
 
 if __name__ == "__main__":
-
+    process_all_tissues(tissue_url, 'normal', 9, True)
     test_index()
-    test_resolution()
+    # test_resolution()
     # res = test_accuracy()
     # print(res)
+
 
 
 
