@@ -371,7 +371,10 @@ std::vector<std::pair<std::string, double>> collision_detection_boolean_operatio
             std::cout << AS.label << " does not bound a volume\n";
             continue;
         }
-        PMP::corefine_and_compute_intersection(raw_AS, raw_tissue, output);
+
+        Surface_mesh raw_AS_copy(raw_AS);
+        Surface_mesh raw_tissue_copy(raw_tissue);
+        PMP::corefine_and_compute_intersection(raw_AS_copy, raw_tissue_copy, output);
         double volume = PMP::volume(output) * 1e9;
         std::cout << AS.label << ": " << volume << std::endl;
         result.push_back({AS.label, volume});

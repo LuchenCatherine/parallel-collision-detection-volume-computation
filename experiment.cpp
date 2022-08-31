@@ -29,18 +29,16 @@ void init(std::unordered_map<std::string, std::vector<Mymesh>> &total_body)
 int main(int argc, char **argv)
 {
 
-    if (argc < 6)
+    if (argc < 5)
     {
-        std::cout << "Please provide the organ_origins_file_path, asct_b_file_path, body_path(model_path) server IP and port number!" << std::endl;
+        std::cout << "Please provide the organ_origins_file_path, asct_b_file_path, body_path(model_path) and tissue path!" << std::endl;
         return 0;
     }
 
     std::string organ_origins_file_path = std::string(argv[1]);
     std::string asct_b_file_path = std::string(argv[2]);
     std::string body_path = std::string(argv[3]);
-    std::string server_ip = std::string(argv[4]);
-    std::string port = std::string(argv[5]);
-
+    std::string tissue_path = std::string(argv[4]);
     // load origins
     gen_origin(organ_origins_file_path, organ_origins);
     load_ASCT_B(asct_b_file_path, mapping, mapping_node_spatial_entity);
@@ -48,14 +46,66 @@ int main(int argc, char **argv)
 
     init(total_body);
 
-    Mymesh boolean_test_tissue("/home/catherine/Research/learningcpp/parallel-collision-detection-volume-computation/tissue_mesh.off");
-    boolean_test_tissue.create_aabb_tree();
-    boolean_test_tissue.extract_faces();
 
-    double elapsed_time = 0;
-    std::string organ_file_name = "VH_F_Kidney_L";
-    auto x = total_body[organ_file_name];
-    auto result = collision_detection_boolean_operation(total_body[organ_file_name], boolean_test_tissue, elapsed_time);
-    std::cout << elapsed_time << std::endl;
+    std::unordered_map<std::string, std::vector<Mymesh>> tissue_maps;  
+
+    auto t1 = std::chrono::high_resolution_clock::now();
+
+    for (fs::directory_entry& organ_path : fs::directory_iterator(tissue_path)) 
+    {
+
+        std::string organ_name = organ_path.path().stem().string();
+           
+        for (fs::directory_entry& tissue : fs::directory_iterator(organ_path)) 
+        {
+            std::string file_path = tissue.path().string();
+            tissue_maps[organ_name].push_back(Mymesh(file_path));
+        }
+
+        for (auto &tissue: tissue_maps[organ_name]){
+            tissue.create_aabb_tree();
+        } 
+
+        for (auto &tissue: tissue_maps[organ_name]) tissue.extract_faces();
+    }
+
+    auto t2 = std::chrono::high_resolution_clock::now();   
+    for (auto &organ_tissues: tissue_maps)
+    {
+        std::string organ_file_name = organ_tissues.first;
+        std::vector<Mymesh> tissue_meshes = organ_tissues.second;
+        std::cout << "tissues of " << organ_file_name << std::endl;
+        double elapsed_time = 0;
+        for (auto &tissue: tissue_meshes)
+        {
+            auto result = collision_detection_boolean_operation(total_body[organ_file_name], tissue, elapsed_time);
+        }
+        
+    }
+    auto t3 = std::chrono::high_resolution_clock::now();
+
+    for (auto &organ_tissues: tissue_maps)
+    {
+        std::string organ_file_name = organ_tissues.first;
+        std::vector<Mymesh> tissue_meshes = organ_tissues.second;
+        std::cout << "tissues of " << organ_file_name << std::endl;
+        double elapsed_time = 0;
+        for (auto &tissue: tissue_meshes)
+        {
+            auto result = collision_detection_single_tissue(total_body[organ_file_name], tissue, elapsed_time);
+        }
+        
+    }
+
+    auto t4 = std::chrono::high_resolution_clock::now();
+
+
+
+
+    std::chrono::duration<double> duration1 = t2 - t1;
+    std::chrono::duration<double> duration2 = t3 - t2;
+    std::chrono::duration<double> duration3 = t4 - t3;
+    
+    std::cout << "loading tissues: " << duration1.count() << " boolean operation: " << duration2.count() << " collision detection: " << duration3.count() << std::endl;
 
 }

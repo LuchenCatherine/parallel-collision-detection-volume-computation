@@ -1,5 +1,5 @@
 #include "service.h"
-
+namespace fs = boost::filesystem;
 
 //display json
 void display_json(
@@ -15,7 +15,7 @@ void parse_json(json::value const &jvalue, json::value &answer)
 
    std::unordered_map<std::string, double> params;
 
-
+   auto tissue_id = jvalue.at("@id").as_string();
    auto target = jvalue.at("target").as_string();
    auto refence_organ_name = organ_split(target); 
    std::cout << "target url: " << target << " target: " << refence_organ_name << " " << std::endl;
@@ -63,10 +63,15 @@ void parse_json(json::value const &jvalue, json::value &answer)
    
    Surface_mesh tissue_mesh;
    std::vector<Point> points; //center of voxels inside the tissue block
-   tissue_transform(params, tissue_mesh, points, 10);
+   // tissue_transform(params, tissue_mesh, points, 10);
    GeoInfo geo_info = extract_params(params);
-   // tissue_transform(geo_info, tissue_mesh);
+   tissue_transform(geo_info, tissue_mesh);
 
+   // std::string path_tissue = "./model/tissue/" + organ_file_name; 
+   // if (!fs::exists(path_tissue)) fs::create_directory(path_tissue);
+   // std::ofstream tissue_file(path_tissue + "/" + tissue_id + ".off" );
+   // tissue_file << tissue_mesh;
+   // tissue_file.close();
 
    Mymesh my_tissue(tissue_mesh);
    my_tissue.create_aabb_tree();
@@ -111,27 +116,6 @@ void parse_json(json::value const &jvalue, json::value &answer)
          answer[i] = AS;
       }
    }
-   // else if (algorithm == "experiment_normal_single")
-   // {
-   //    auto t1 = std::chrono::high_resolution_clock::now();
-   //    auto result = collision_detection_single_tissue(total_body[organ_file_name], my_tissue);
-   //    auto t2 = std::chrono::high_resolution_clock::now();
-   //    std::chrono::duration<double> duration2 = t2 - t1;
-   //    std::cout << "normal running time is " << duration2.count() << " seconds" << std::endl;  
-
-   //    print_result(algorithm, result);
-
-   // }
-   // else if (algorithm == "experiment_parallel_single")
-   // {
-   //    auto t1 = std::chrono::high_resolution_clock::now();
-   //    auto result = collision_detection_single_tissue_parallel(total_body[organ_file_name], my_tissue);
-   //    auto t2 = std::chrono::high_resolution_clock::now();
-   //    std::chrono::duration<double> duration2 = t2 - t1;
-   //    std::cout << "parallel running time is " << duration2.count() << " seconds" << std::endl;  
-
-   //    print_result(algorithm, result);
-   // }
    else if (algorithm == "brute_force")
    {
       double elapsed_time = 0;
